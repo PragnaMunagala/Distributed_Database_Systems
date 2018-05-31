@@ -1,0 +1,75 @@
+Video Link:
+
+https://youtu.be/XXl4zixs_WI
+
+
+
+************************************************
+Running Code:
+
+import org.datasyslab.geospark.spatialOperator.RangeQuery; 
+import org.datasyslab.geospark.spatialRDD.PointRDD;
+import com.vividsolutions.jts.geom.Envelope;
+import org.datasyslab.geospark.enums.FileDataSplitter;
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+import org.apache.spark.storage.StorageLevel;
+import org.datasyslab.geospark.enums.IndexType;
+import org.datasyslab.geospark.spatialOperator.KNNQuery;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.Coordinate;
+import org.datasyslab.geospark.spatialOperator.JoinQuery;
+import org.datasyslab.geospark.spatialRDD.RectangleRDD;
+import org.datasyslab.geospark.enums.GridType;
+
+
+//1
+val conf = new SparkConf().setAppName("Simple Application").set("spark.driver.allowMultipleContexts", "true").setMaster("spark://master:7077");
+sc.stop();
+val sc = new SparkContext(conf);
+val objectRDD = new PointRDD(sc, "hdfs://master:9000/arealm.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY);
+
+
+//2a
+val queryEnvelope=new Envelope (-113.79,-109.73,35.08,32.99);
+val resultSize2a = RangeQuery.SpatialRangeQuery(objectRDD, queryEnvelope, false, false).count();
+
+//2b
+objectRDD.buildIndex(IndexType.RTREE,false);
+val resultSize2a = RangeQuery.SpatialRangeQuery(objectRDD, queryEnvelope, false, true).count();
+
+
+//3a
+val fact=new GeometryFactory();
+val objectRDD = new PointRDD(sc, "hdfs://master:9000/arealm.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY);
+val queryPoint=fact.createPoint(new Coordinate(35.08, -113.79));
+val resultSize3a = KNNQuery.SpatialKnnQuery(objectRDD, queryPoint, 5, false);
+
+//3b
+objectRDD.buildIndex(IndexType.RTREE,false);
+val resultSize3b = KNNQuery.SpatialKnnQuery(objectRDD, queryPoint, 5, true);
+
+
+//4a
+val objectRDD = new PointRDD(sc, "hdfs://master:9000/arealm.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY);
+val rectangleRDD = new RectangleRDD(sc, "hdfs://master:9000/zcta510.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY); 
+objectRDD.spatialPartitioning(GridType.EQUALGRID);
+rectangleRDD.spatialPartitioning(objectRDD.grids);
+val resultSize = JoinQuery.SpatialJoinQuery(objectRDD,rectangleRDD,false,false).count();
+
+//4b
+val objectRDD = new PointRDD(sc, "hdfs://master:9000/arealm.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY);
+val rectangleRDD = new RectangleRDD(sc, "hdfs://master:9000/zcta510.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY); 
+objectRDD.spatialPartitioning(GridType.EQUALGRID);
+objectRDD.buildIndex(IndexType.RTREE,true);
+rectangleRDD.spatialPartitioning(objectRDD.grids);
+val resultSize = JoinQuery.SpatialJoinQuery(objectRDD,rectangleRDD,true,false).count();
+
+//4c
+val objectRDD = new PointRDD(sc, "hdfs://master:9000/arealm.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY);
+val rectangleRDD = new RectangleRDD(sc, "hdfs://master:9000/zcta510.csv", 0, FileDataSplitter.CSV, false, StorageLevel.MEMORY_ONLY); 
+objectRDD.spatialPartitioning(GridType.RTREE);
+rectangleRDD.spatialPartitioning(objectRDD.grids);
+val resultSize = JoinQuery.SpatialJoinQuery(objectRDD,rectangleRDD,false,true).count();
+
